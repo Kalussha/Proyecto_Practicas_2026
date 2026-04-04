@@ -23,6 +23,13 @@ export interface FolioComment {
   author?: string;
 }
 
+export interface JustificationLog {
+  id: string;
+  text: string;
+  createdAt: string;
+  author: string;
+}
+
 export interface Folio {
   id: string;
   clientName: string;
@@ -41,16 +48,22 @@ export interface Folio {
     idNumber: string;
     date: string;
   };
-  justification?: string;
+  justification?: string; // Mantener por retrocompatibilidad si fuese necesario, pero ya obsoleto
+  justifications?: JustificationLog[];
   serviceDetails?: ServiceDetails;
   comments?: FolioComment[];
   assemblyFinished?: boolean;
   partsRequested?: boolean;
   
+  // Novedades Ventas / Creación
+  createdBy?: string;
+  creationComments?: string;
+  
   // Específicos de Garantía
   warrantyRequiresParts?: boolean;
   warrantyPartsComment?: string;
   warrantyUpdateStatus?: WarrantyUpdateStatus;
+  warrantyWholesaleProvider?: string;
 }
 
 interface FolioStore {
@@ -58,6 +71,7 @@ interface FolioStore {
   addFolio: (folioData: Omit<Folio, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'testsCompleted'>) => Folio;
   updateFolioStatus: (id: string, status: FolioStatus, extraData?: Partial<Folio>) => void;
   updateFolio: (id: string, data: Partial<Folio>) => void;
+  addJustification: (id: string, text: string, author: string) => void;
 }
 
 // Datos falsos para que el MVP no se vea vacío inicialmente
@@ -68,10 +82,12 @@ const MOCK_DATA: Folio[] = [
     brand: 'Dell',
     provider: 'TechSupplies',
     status: 'Abierto',
-    createdAt: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(), // Hace 50 horas (para probar "En Espera" > 48h)
+    createdAt: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
     type: 'Garantía',
     testsCompleted: [],
+    createdBy: 'miguel',
+    creationComments: 'El equipo se apagó de repente y no vuelve a encender.',
   },
   {
     id: 'F-002',
@@ -83,6 +99,8 @@ const MOCK_DATA: Folio[] = [
     updatedAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
     type: 'Soporte',
     testsCompleted: ['Encendido', 'Reemplazo de pieza'],
+    createdBy: 'luis',
+    creationComments: 'Cliente solicita revisión de disco duro por ruidos extraños.',
     deliveryInfo: {
       name: 'María Gómez',
       idNumber: 'INE-123456',
@@ -99,6 +117,8 @@ const MOCK_DATA: Folio[] = [
     updatedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
     type: 'Garantía',
     testsCompleted: [],
+    createdBy: 'gabriela',
+    creationComments: 'Problemas de calentamiento, ya se usó garantía anteriormente.',
   }
 ];
 
@@ -148,6 +168,22 @@ export const useFolioStore = create<FolioStore>()(
               ? { ...folio, ...data, updatedAt: new Date().toISOString() }
               : folio
           ),
+        }));
+      },
+
+      addJustification: (id, text, author) => {
+        set((state) => ({
+          folios: state.folios.map((folio) => {
+            if (folio.id === id) {
+              const newJust={ id: Date.now().toString(), text, createdAt: new Date().toISOString(), author };
+              return { 
+                ...folio, 
+                justifications: [...(folio.justifications || []), newJust],
+                updatedAt: new Date().toISOString() 
+              };
+            }
+            return folio;
+          }),
         }));
       }
     }),

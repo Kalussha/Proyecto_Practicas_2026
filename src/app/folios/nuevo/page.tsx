@@ -2,21 +2,25 @@
 import React, { useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { useFolioStore, Folio } from '@/store/useFolioStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { FileUp, Save, PenTool, Printer, ArrowLeft } from 'lucide-react';
 
 export default function NuevoFolioPage() {
   const { addFolio } = useFolioStore();
+  const { role, userName } = useAuthStore();
   const router = useRouter();
   const sigCanvas = useRef<SignatureCanvas>(null);
   
   const [createdFolio, setCreatedFolio] = useState<Folio | null>(null);
+  const isVentas = role === 'Ventas';
 
   const [formData, setFormData] = useState({
     clientName: '',
     provider: '',
     type: 'Garantía' as 'Soporte' | 'Garantía',
     evidenceFiles: [] as File[],
+    creationComments: '',
   });
 
   const [serviceData, setServiceData] = useState({
@@ -37,7 +41,7 @@ export default function NuevoFolioPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.clientName || !formData.provider || !serviceData.product || !serviceData.clientKey) {
+    if (!formData.clientName || (!isVentas && !formData.provider) || !serviceData.product || !serviceData.clientKey) {
       alert("Por favor completa todos los campos obligatorios (Cliente, Proveedor, Producto, Clave de Cliente).");
       return;
     }
@@ -66,11 +70,13 @@ export default function NuevoFolioPage() {
     const newFolio = addFolio({
       clientName: formData.clientName,
       brand: serviceData.product, // Mapeamos producto a brand para mantener compatibilidad histórica
-      provider: formData.provider,
+      provider: isVentas ? 'Por Asignar' : formData.provider,
       type: formData.type,
       evidenceUrls: evidenceBase64Array,
       signature: signatureBase64,
       serviceDetails: finalServiceData,
+      createdBy: userName,
+      creationComments: formData.creationComments,
     });
 
     setCreatedFolio(newFolio); // Ambos flujos ahora ven el recibo
@@ -210,22 +216,24 @@ export default function NuevoFolioPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Proveedor Asignado *</label>
-              <select 
-                required
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-slate-900 outline-none transition bg-white"
-                value={formData.provider}
-                onChange={(e) => setFormData({...formData, provider: e.target.value})}
-              >
-                <option value="">Selecciona un proveedor</option>
-                <option value="Servicios Alfa">Servicios Alfa</option>
-                <option value="TechSupplies">TechSupplies</option>
-                <option value="GlobalParts">GlobalParts</option>
-                <option value="QuickFix">QuickFix</option>
-                {formData.type === 'Soporte' && <option value="Interno (Soporte Técnico)">Interno (Soporte Técnico)</option>}
-              </select>
-            </div>
+            {!isVentas && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Proveedor Asignado *</label>
+                <select 
+                  required={!isVentas}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-slate-900 outline-none transition bg-white"
+                  value={formData.provider}
+                  onChange={(e) => setFormData({...formData, provider: e.target.value})}
+                >
+                  <option value="">Selecciona un proveedor</option>
+                  <option value="Servicios Alfa">Servicios Alfa</option>
+                  <option value="TechSupplies">TechSupplies</option>
+                  <option value="GlobalParts">GlobalParts</option>
+                  <option value="QuickFix">QuickFix</option>
+                  {formData.type === 'Soporte' && <option value="Interno (Soporte Técnico)">Interno (Soporte Técnico)</option>}
+                </select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Clave de Cliente *</label>
@@ -262,50 +270,57 @@ export default function NuevoFolioPage() {
               <textarea rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition" placeholder="Detalles de la falla, estado físico del equipo, accesorios entregados..." value={serviceData.observations} onChange={(e) => setServiceData({...serviceData, observations: e.target.value})} />
             </div>
 
-            {formData.type === 'Garantía' && (
+            <div className="space-y-2 col-span-1 md:col-span-2">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">Comentarios Adicionales del Alta (Interno)</label>
+              <textarea rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none bg-orange-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition" placeholder="Notas internas para el equipo de soporte sobre esta recepción..." value={formData.creationComments} onChange={(e) => setFormData({...formData, creationComments: e.target.value})} />
+            </div>
+
+            {!isVentas && formData.type === 'Garantía' && (
               <div className="space-y-2 col-span-1 md:col-span-2">
                 <label className="text-sm font-bold text-slate-800 flex items-center gap-2">Observaciones del Área de Soporte</label>
                 <textarea rows={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" placeholder="Notas sobre revisión inicial que avale la garantía..." value={serviceData.supportAreaObservations} onChange={(e) => setServiceData({...serviceData, supportAreaObservations: e.target.value})} />
               </div>
             )}
 
-            <div className="space-y-2 col-span-1 md:col-span-2 mt-2 pt-4 border-t border-slate-100">
-              <label className="text-sm font-medium text-slate-700">Evidencias (Máx 20 archivos)</label>
-              <div className="w-full relative border-2 border-dashed border-slate-300 rounded-lg px-4 py-4 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition group cursor-pointer">
-                <input 
-                  type="file" 
-                  multiple
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      const newFiles = Array.from(e.target.files);
-                      if (formData.evidenceFiles.length + newFiles.length > 20) {
-                        alert('Solo puedes subir hasta 20 evidencias por folio.');
-                        return;
+            {!isVentas && (
+              <div className="space-y-2 col-span-1 md:col-span-2 mt-2 pt-4 border-t border-slate-100">
+                <label className="text-sm font-medium text-slate-700">Evidencias (Máx 20 archivos)</label>
+                <div className="w-full relative border-2 border-dashed border-slate-300 rounded-lg px-4 py-4 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition group cursor-pointer">
+                  <input 
+                    type="file" 
+                    multiple
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        const newFiles = Array.from(e.target.files);
+                        if (formData.evidenceFiles.length + newFiles.length > 20) {
+                          alert('Solo puedes subir hasta 20 evidencias por folio.');
+                          return;
+                        }
+                        setFormData({...formData, evidenceFiles: [...formData.evidenceFiles, ...newFiles]});
                       }
-                      setFormData({...formData, evidenceFiles: [...formData.evidenceFiles, ...newFiles]});
-                    }
-                  }}
-                />
-                <div className="flex flex-col items-center gap-2 text-slate-500 group-hover:text-primary-600 transition">
-                  <FileUp size={24} />
-                  <span className="text-sm font-medium">Click o arrastrar para subir imágenes/PDFs</span>
+                    }}
+                  />
+                  <div className="flex flex-col items-center gap-2 text-slate-500 group-hover:text-primary-600 transition">
+                    <FileUp size={24} />
+                    <span className="text-sm font-medium">Click o arrastrar para subir imágenes/PDFs</span>
+                  </div>
                 </div>
+                
+                {formData.evidenceFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {formData.evidenceFiles.map((f, i) => (
+                      <div key={i} className="bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 shadow-sm">
+                        <span className="truncate max-w-[150px]">{f.name}</span>
+                        <button type="button" onClick={() => setFormData({...formData, evidenceFiles: formData.evidenceFiles.filter((_, index) => index !== i)})} className="text-slate-500 hover:text-red-500">
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              
-              {formData.evidenceFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {formData.evidenceFiles.map((f, i) => (
-                    <div key={i} className="bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 shadow-sm">
-                      <span className="truncate max-w-[150px]">{f.name}</span>
-                      <button type="button" onClick={() => setFormData({...formData, evidenceFiles: formData.evidenceFiles.filter((_, index) => index !== i)})} className="text-slate-500 hover:text-red-500">
-                        &times;
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           <div className="space-y-2 border-t border-slate-200 pt-6">

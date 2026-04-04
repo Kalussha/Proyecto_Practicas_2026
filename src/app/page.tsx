@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useFolioStore } from '@/store/useFolioStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Package, CheckCircle2, AlertCircle, Clock, Wrench, ShieldCheck } from 'lucide-react';
 
 export default function DashboardPage() {
   const { folios } = useFolioStore();
+  const { role } = useAuthStore();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -13,6 +15,7 @@ export default function DashboardPage() {
   }, []);
 
   if (!isClient) return <div className="p-8 text-primary-500 font-medium">Cargando métricas...</div>;
+  if (role === 'Ventas') return <div className="p-8 text-center text-slate-500 font-bold text-xl mt-20">Acceso denegado. <br/><span className="text-sm font-normal">Solo el personal de Soporte y Directiva puede ver los reportes ejecutivos. Por favor usa la opción de "Nuevo Folio".</span></div>;
 
   const total = folios.length;
   const abiertos = folios.filter(f => f.status === 'Abierto').length;
